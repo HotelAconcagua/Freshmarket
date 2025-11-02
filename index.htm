@@ -40,8 +40,9 @@
             
             /* CRÍTICO: Controla el tamaño de la página física */
             @page {
+                /* MARGEN DE 0.5CM APLICADO */
                 size: A4;
-                margin: 0.3cm; /* Margen muy reducido para dar espacio */
+                margin: 0.5cm; /* Margen unificado para dar espacio */
             }
 
             body {
@@ -52,7 +53,8 @@
                 /* ** NUEVO: FORZAR ESCALADO ** */
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
-                zoom: 85%; /* Escalado al 85% para garantizar que quepa */
+                /* Subimos el zoom a 90% */
+                zoom: 90%; 
                 overflow: hidden; /* Evitar barras de desplazamiento que fuerzan páginas extra */
             }
             .print-hidden {
@@ -69,6 +71,11 @@
             /* Asegurar que la tabla y sus elementos no se corten */
             .price-table {
                 font-size: 9pt; /* Fuente más pequeña para ahorrar espacio */
+                page-break-inside: avoid;
+            }
+
+            /* *** APLICAR PAGE-BREAK-INSIDE AL BLOQUE DE AUTOSERVICIO *** */
+            .autoservicio-box {
                 page-break-inside: avoid;
             }
 
