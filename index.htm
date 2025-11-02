@@ -41,13 +41,19 @@
             /* CRÍTICO: Controla el tamaño de la página física */
             @page {
                 size: A4;
-                margin: 0.5cm; /* Margen mínimo para la impresora */
+                margin: 0.3cm; /* Margen muy reducido para dar espacio */
             }
 
             body {
                 background-color: white !important;
                 padding: 0;
                 margin: 0;
+                
+                /* ** NUEVO: FORZAR ESCALADO ** */
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                zoom: 85%; /* Escalado al 85% para garantizar que quepa */
+                overflow: hidden; /* Evitar barras de desplazamiento que fuerzan páginas extra */
             }
             .print-hidden {
                 display: none !important;
@@ -56,19 +62,19 @@
                 max-width: none !important;
                 /* El padding y margen se ajustan para que quepa en el A4 */
                 margin: 0 !important; 
-                padding: 1cm !important; 
+                padding: 0.5cm !important; /* Padding ajustado a 0.5cm */
                 box-shadow: none !important;
             }
             
             /* Asegurar que la tabla y sus elementos no se corten */
             .price-table {
-                font-size: 10pt;
+                font-size: 9pt; /* Fuente más pequeña para ahorrar espacio */
                 page-break-inside: avoid;
             }
 
             /* Estilos de tabla sin colores fuertes y sin bordes de celda */
             .price-table th, .price-table td {
-                padding: 0.75rem; 
+                padding: 0.5rem; /* Padding reducido en impresión */
                 border-bottom: 1px solid #cccccc;
             }
             .price-table th {
@@ -493,7 +499,7 @@
             } catch (e) {
                 console.error("Error fatal en la inicialización:", e);
                 loadingMessage.classList.add('hidden');
-                errorMessage.textContent = `No se pudo iniciar la aplicación: ${e.message}`;
+                    errorMessage.textContent = `No se pudo iniciar la aplicación: ${e.message}`;
                 errorMessage.classList.remove('hidden');
             }
         }
