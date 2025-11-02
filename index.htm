@@ -147,13 +147,7 @@
         import { getFirestore, collection, query, onSnapshot, getDocs, addDoc, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Variables Globales del Entorno (MANDATORIO)
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-freshmarket-app';
-        
-        // --- INICIO DE CORRECCIÓN: Manejo de Configuración ---
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // Configuración de FALLBACK (usando las claves de 'control-piscina-48181')
+        // --- Configuración de FALLBACK (usando las claves de 'control-piscina-48181') ---
         const FALLBACK_FIREBASE_CONFIG = {
             apiKey: "AIzaSyD_vUGs0iDY0w45OlFjPCaOX58YI7J0xDI",
             authDomain: "control-piscina-48181.firebaseapp.com",
@@ -161,10 +155,13 @@
             storageBucket: "control-piscina-48181.firebasestorage.app",
             appId: "1:651276695583:web:02a25b22bcb52d5a05fd2a"
         };
+        // ---------------------------------------------------------------------------------
 
-        // Usa la configuración inyectada por el entorno si existe y no está vacía,
-        // de lo contrario, usa la configuración de fallback.
+        // Variables Globales del Entorno (MANDATORIO)
         let firebaseConfig = FALLBACK_FIREBASE_CONFIG;
+        let appId = FALLBACK_FIREBASE_CONFIG.projectId; // Usar projectId como fallback para AppId si es necesario
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
         if (typeof __firebase_config !== 'undefined') {
             try {
                 const envConfig = JSON.parse(__firebase_config);
@@ -175,8 +172,14 @@
                 console.warn("Error al parsear __firebase_config. Usando fallback.");
             }
         }
-        // --- FIN DE CORRECCIÓN ---
-
+        
+        // CORRECCIÓN 2: Asegurar que appId use el valor inyectado si está disponible y es diferente.
+        if (typeof __app_id !== 'undefined' && __app_id.length > 0) {
+             appId = __app_id;
+        } else {
+             // Si el __app_id inyectado falla, usamos el projectId del fallback.
+             appId = firebaseConfig.projectId;
+        }
 
         const loadingMessage = document.getElementById('loading-message');
         const errorMessage = document.getElementById('error-message');
@@ -298,6 +301,7 @@
                 }
                 
                 // 3. Definir la ruta de la colección (Datos Públicos)
+                // Se usa el appId (que ahora tiene un fallback robusto)
                 const collectionPath = `/artifacts/${appId}/public/data/${COLLECTION_NAME}`;
                 const productsColRef = collection(db, collectionPath);
                 
@@ -334,7 +338,8 @@
                 }, (error) => {
                     console.error("Error al obtener los datos de Firestore:", error);
                     loadingMessage.classList.add('hidden');
-                    errorMessage.textContent = `Error de conexión: ${error.message}`;
+                    // Muestra el error de permisos directamente al usuario, ya que es la causa.
+                    errorMessage.textContent = `Error de conexión: Missing or insufficient permissions. Revise sus reglas de seguridad para Firestore.`;
                     errorMessage.classList.remove('hidden');
                 });
                 
