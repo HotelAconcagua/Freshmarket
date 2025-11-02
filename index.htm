@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fresh Market - Raíces Aconcagua Mendoza</title>
+    <!-- Carga de Tailwind CSS para un diseño rápido y responsive -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Estilos personalizados para la aplicación */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+        }
+
+        /* Estilos específicos para la tabla de precios */
+        .price-table {
+            border-collapse: collapse;
+            width: 100%;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+
+        .price-table th, .price-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        /* Estilos para el pie de página de Autoservicio */
+        .autoservicio-box {
+            background-color: #e0f2f1; /* Un color suave para destacar */
+            border-left: 5px solid #009688; /* Borde de color de marca */
+        }
+
+        /* *** Estilos de IMPRESIÓN (Cartelería) *** */
+        @media print {
+            body {
+                background-color: white !important;
+                padding: 0;
+            }
+            .print-hidden {
+                display: none !important;
+            }
+            .container-main {
+                max-width: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+            }
+            .price-table th, .price-table td {
+                padding: 0.75rem; 
+                border-bottom: 1px solid #cccccc;
+            }
+            .price-table th {
+                background-color: #f0f0f0 !important;
+                -webkit-print-color-adjust: exact; 
+                /* CORRECCIÓN: Usamos la propiedad estándar "print-color-adjust" */
+                print-color-adjust: exact;
+            }
+            .price-table {
+                font-size: 10pt;
+            }
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <!-- Contenedor Principal -->
+    <div class="container-main max-w-4xl mx-auto bg-white rounded-xl shadow-2xl p-6 sm:p-10">
+        
+        <!-- Logo y Encabezado Fijo -->
+        <div class="flex flex-col items-center border-b pb-6 mb-6">
+            <!-- Simulación de Logo (Reemplazar con tu imagen si es necesario) -->
+            <h1 class="text-xl font-bold text-gray-700">RAICES ACONCAGUA MENDOZA</h1>
+            <h2 class="text-4xl font-extrabold mt-2 text-teal-700 tracking-tight">FRESH MARKET</h2>
+        </div>
+
+        <!-- Mensaje de Carga y Errores (print-hidden) -->
+        <div id="loading-message" class="text-center p-4 text-gray-500 print-hidden">
+            Cargando lista de precios...
+        </div>
+        <div id="error-message" class="text-center p-4 text-red-500 hidden print-hidden">
+            Ocurrió un error al cargar los precios. Por favor, recargue la página.
+        </div>
+        
+        <!-- MENSAJE DE ADMINISTRACIÓN (OCULTO POR DEFECTO) -->
+        <div id="init-message-container" class="print-hidden hidden">
+            <div id="init-message" class="text-center p-2 text-orange-500 text-sm rounded-md bg-orange-100 border border-orange-200">
+                Base de datos de precios inicializada con datos por defecto.
+            </div>
+            <!-- Mensaje adicional de modo admin -->
+            <p id="admin-notice" class="text-center mt-2 text-xs text-red-700 bg-red-100 border border-red-300 p-1 rounded">
+                MODO ADMINISTRADOR ACTIVO: Los datos han sido cargados/limpiados. Remueva `?admin=true` del URL para ocultar este mensaje.
+            </p>
+        </div>
+
+
+        <!-- Tabla de Productos (Renderizada por JS) -->
+        <div class="overflow-x-auto">
+            <table class="price-table">
+                <thead>
+                    <tr class="bg-teal-50 text-teal-800 uppercase text-sm leading-normal">
+                        <th class="py-3 px-6 font-bold w-1/3">Descripción (ES)</th>
+                        <th class="py-3 px-6 font-bold w-1/3">Description (EN)</th>
+                        <th class="py-3 px-6 font-bold w-1/6 text-right">Precio</th>
+                    </tr>
+                </thead>
+                <tbody id="products-list" class="text-gray-700 text-base font-light">
+                    <!-- Las filas de productos se insertarán aquí por JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Sección de Autoservicio 24 HS -->
+        <div class="autoservicio-box p-6 mt-8 rounded-lg">
+            <h3 class="text-lg sm:text-xl font-bold mb-2 text-teal-800">AUTOSERVICIO 24 HS</h3>
+            <p class="text-sm sm:text-base mb-3 text-gray-800">
+                **Estimado Huésped:** El sistema es auto servicio, al retirar su producto deberá completar la comanda
+                indicando su número de habitación y su nombre completo, luego depositar el papel
+                en la urna para que se le cargue a su cuenta.
+            </p>
+            <hr class="border-teal-400 my-3">
+            <p class="text-sm sm:text-base text-gray-700 italic">
+                **Dear Guest:** The system is self-service. When withdrawing a product, you must complete the order
+                indicating your room number and your full name, then deposit the paper into the box
+                so that it will be added to your account.
+            </p>
+        </div>
+
+        <!-- Botón de Imprimir (OCULTO POR DEFECTO PARA HUÉSPEDES) -->
+        <div id="admin-controls" class="text-center mt-8 print-hidden hidden">
+            <!-- El botón ahora es puramente visual y la impresión se indica por texto -->
+            <button id="print-button" onclick="window.print()" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition duration-300">
+                Imprimir para Cartelería
+            </button>
+            <p class="mt-3 text-sm text-gray-600 font-semibold">
+                (Atajo de teclado: **Ctrl + P** o **Cmd + P**)
+            </p>
+        </div>
+    </div>
+
+    <!-- Script de Firebase y Lógica -->
+    <script type="module">
+        // Importaciones de Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, query, onSnapshot, getDocs, addDoc, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // Variables Globales del Entorno (MANDATORIO)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-freshmarket-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        const loadingMessage = document.getElementById('loading-message');
+        const errorMessage = document.getElementById('error-message');
+        const initMessageContainer = document.getElementById('init-message-container');
+        const initMessage = document.getElementById('init-message');
+        const adminControls = document.getElementById('admin-controls');
+        const productsListBody = document.getElementById('products-list');
+        
+        let db, auth;
+        // La COLECCIÓN HA SIDO CAMBIADA a 'menu_market' para diferenciarla de otras apps.
+        const COLLECTION_NAME = 'menu_market';
+
+        // Determinar el modo administrador
+        const urlParams = new URLSearchParams(window.location.search);
+        const isAdminMode = urlParams.get('admin') === 'true';
+
+        // Lista de productos actualizada con los últimos datos proporcionados.
+        const INITIAL_PRODUCTS = [
+            { descripcion_es: "Agua Mineral", description_en: "Mineral water", precio: 4200 },
+            { descripcion_es: "Café", description_en: "Coffee", precio: 4500 },
+            { descripcion_es: "Cerveza Lata", description_en: "Canned Beer", precio: 6000 },
+            { descripcion_es: "Coca Cola", description_en: "Coca Cola", precio: 4200 },
+            { descripcion_es: "Doritos Queso", description_en: "Doritos Cheese", precio: 7800 },
+            { descripcion_es: "Ensalada de Frutas", description_en: "Fruit Salad", precio: 6000 },
+            { descripcion_es: "Fanta", description_en: "Fanta", precio: 4200 },
+            { descripcion_es: "Sandwich de Jamón y Queso", description_en: "Ham and Cheese Sandwich", precio: 3800 },
+            { descripcion_es: "Galletas Mini Oreo", description_en: "Mini Oreo Cookies", precio: 2600 },
+            { descripcion_es: "Galletas Toddy", description_en: "Toddy Cookies", precio: 5300 },
+            { descripcion_es: "Infusiones, Té", description_en: "Infusions, Tea", precio: 1500 },
+            { descripcion_es: "Jugo de Frutas", description_en: "Fruit Juice", precio: 6000 },
+            { descripcion_es: "Mix Frutos Secos", description_en: "Mixed Nuts", precio: 5500 },
+            { descripcion_es: "Mix Mani", description_en: "Mix Mani", precio: 7000 },
+            { descripcion_es: "Cheetos Queso", description_en: "Cheetos Cheese", precio: 8400 },
+            { descripcion_es: "Papas Fritas Lays", description_en: "Lays Potato Chips", precio: 8500 },
+            { descripcion_es: "Sprite", description_en: "Sprite", precio: 4200 },
+            { descripcion_es: "Vino tinto", description_en: "Red wine", precio: 16400 },
+            { descripcion_es: "Yogurt 160g", description_en: "Yogurt 160g", precio: 4600 },
+        ];
+
+
+        // Función para convertir la data de precio a string de moneda
+        const formatPrice = (price) => {
+            if (typeof price !== 'number') return '$ N/A';
+            return new Intl.NumberFormat('es-AR', {
+                style: 'currency',
+                currency: 'ARS',
+                minimumFractionDigits: 0
+            }).format(price);
+        };
+
+        /**
+         * Intenta borrar todos los documentos de la colección.
+         * Solo se llama en Modo Administrador
+         */
+        async function deleteCollection(productsColRef) {
+            try {
+                initMessage.textContent = 'Borrando datos antiguos de la base de datos...';
+                initMessageContainer.classList.remove('hidden');
+
+                const snapshot = await getDocs(productsColRef);
+                const batch = writeBatch(db);
+
+                snapshot.docs.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+
+                await batch.commit();
+                console.log(`Eliminados ${snapshot.size} documentos antiguos.`);
+                initMessage.textContent = 'Datos antiguos borrados exitosamente.';
+            } catch (e) {
+                console.error("Error durante la eliminación de datos:", e);
+                initMessage.textContent = `Advertencia: Error al borrar datos antiguos. ${e.message}`;
+            }
+        }
+        
+        /**
+         * Carga los datos iniciales.
+         * Solo se llama en Modo Administrador
+         */
+        async function initializeData(productsColRef) {
+            try {
+                initMessage.textContent = 'Cargando nuevos datos por defecto...';
+                initMessageContainer.classList.remove('hidden');
+
+                for (const product of INITIAL_PRODUCTS) {
+                    await addDoc(productsColRef, product);
+                }
+                console.log("Datos iniciales cargados exitosamente.");
+                initMessage.textContent = 'Base de datos de precios inicializada con los nuevos datos.';
+                // Ocultar el mensaje después de 5 segundos si está en modo admin
+                setTimeout(() => initMessageContainer.classList.add('hidden'), 5000); 
+
+            } catch (e) {
+                console.error("Error durante la inicialización de datos:", e);
+                initMessage.textContent = `Advertencia: Error al cargar datos. ${e.message}`;
+                initMessageContainer.classList.remove('hidden');
+            }
+        }
+
+
+        // Función principal de inicialización y carga de datos
+        async function initApp() {
+            try {
+                if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
+                    throw new Error("La configuración de Firebase no está disponible.");
+                }
+                
+                // 1. Inicializar Firebase
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // 2. Autenticación (se usa el token inicial o se inicia anónimamente)
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                // 3. Definir la ruta de la colección (Datos Públicos)
+                const collectionPath = `/artifacts/${appId}/public/data/${COLLECTION_NAME}`;
+                const productsColRef = collection(db, collectionPath);
+                
+                // 4. Lógica de Modo Administrador (limpieza y carga)
+                if (isAdminMode) {
+                    adminControls.classList.remove('hidden'); // Mostrar el botón de impresión
+                    initMessageContainer.classList.remove('hidden'); // Mostrar el contenedor de mensajes
+                    
+                    // Solo para la primera carga y garantizar los nuevos datos
+                    await deleteCollection(productsColRef);
+                    await initializeData(productsColRef);
+                } else {
+                    // Ocultar mensajes de inicialización si no estamos en modo admin
+                    initMessageContainer.classList.add('hidden');
+                }
+                
+                // 5. Establecer un listener en tiempo real (onSnapshot) para leer los datos
+                onSnapshot(productsColRef, (snapshot) => {
+                    const products = [];
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        products.push({ id: doc.id, ...data }); 
+                    });
+
+                    // Ordenar los productos localmente por la descripción en español
+                    products.sort((a, b) => (a.descripcion_es || '').localeCompare(a.descripcion_es || ''));
+
+                    // Renderizar la tabla
+                    renderTable(products);
+
+                    // Ocultar mensaje de carga ya que el listener está activo y ha cargado datos
+                    loadingMessage.classList.add('hidden');
+
+                }, (error) => {
+                    console.error("Error al obtener los datos de Firestore:", error);
+                    loadingMessage.classList.add('hidden');
+                    errorMessage.textContent = `Error de conexión: ${error.message}`;
+                    errorMessage.classList.remove('hidden');
+                });
+                
+            } catch (e) {
+                console.error("Error fatal en la inicialización:", e);
+                loadingMessage.classList.add('hidden');
+                errorMessage.textContent = `No se pudo iniciar la aplicación: ${e.message}`;
+                errorMessage.classList.remove('hidden');
+            }
+        }
+
+        // Función para renderizar la tabla
+        function renderTable(products) {
+            productsListBody.innerHTML = ''; // Limpiar la tabla
+
+            if (products.length === 0) {
+                productsListBody.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="py-4 text-center text-gray-500">
+                            No hay productos cargados. Por favor, cargue la lista usando el modo administrador.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            products.forEach(product => {
+                const row = document.createElement('tr');
+                row.classList.add('hover:bg-gray-50', 'transition', 'duration-150');
+                
+                // Asegurar que los datos estén presentes para evitar errores
+                const descEs = product.descripcion_es || 'N/A';
+                const descEn = product.description_en || 'N/A';
+                const price = formatPrice(product.precio);
+
+                row.innerHTML = `
+                    <td class="py-3 px-6">${descEs}</td>
+                    <td class="py-3 px-6 text-gray-500">${descEn}</td>
+                    <td class="py-3 px-6 text-right font-semibold text-teal-600">${price}</td>
+                `;
+                productsListBody.appendChild(row);
+            });
+        }
+
+        // Inicializar la aplicación al cargar la ventana
+        window.onload = initApp;
+    </script>
+    
+    <!-- Aviso de seguridad (no visible para el usuario) -->
+    <!-- Nota: La variable __app_id, __firebase_config y __initial_auth_token son inyectadas por el entorno. -->
+
+</body>
+</html>
