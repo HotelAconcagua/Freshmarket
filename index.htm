@@ -6,6 +6,8 @@
     <title>Fresh Market - Raíces Aconcagua Mendoza</title>
     <!-- Carga de Tailwind CSS para un diseño rápido y responsive -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de la librería SheetJS (xlsx) para leer archivos de Excel/CSV (Necesario para cargar nueva lista) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         /* Estilos personalizados para la aplicación */
@@ -128,15 +130,34 @@
             </p>
         </div>
 
-        <!-- Botón de Imprimir (OCULTO POR DEFECTO PARA HUÉSPEDES) -->
-        <div id="admin-controls" class="text-center mt-8 print-hidden hidden">
-            <!-- El botón ahora es puramente visual y la impresión se indica por texto -->
-            <button id="print-button" onclick="window.print()" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition duration-300">
-                Imprimir para Cartelería
-            </button>
-            <p class="mt-3 text-sm text-gray-600 font-semibold">
-                (Atajo de teclado: **Ctrl + P** o **Cmd + P**)
-            </p>
+        <!-- Botones de Administración (Carga y Imprimir) -->
+        <div id="admin-controls" class="text-center mt-8 print-hidden hidden space-y-4">
+            
+            <!-- 1. Carga de Nueva Lista (CSV/Excel) -->
+            <div class="flex items-center justify-center space-x-4">
+                <!-- Input de Archivo Oculto -->
+                <input type="file" id="file-input" accept=".csv, .xlsx, .xls, .ods" class="hidden" onchange="window.handleFileUpload(event)">
+                
+                <!-- Botón de Carga -->
+                <button onclick="document.getElementById('file-input').click()" class='bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition duration-300'>
+                    Cargar Nueva Lista (CSV/Excel)
+                </button>
+            </div>
+
+            <!-- Separador -->
+            <div class="pt-4 border-t border-gray-200">
+                <p class="text-sm text-gray-500 font-semibold mb-3">O</p>
+            </div>
+
+            <!-- 2. Impresión -->
+            <div>
+                <button id="print-button" onclick="window.print()" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition duration-300">
+                    Imprimir para Cartelería
+                </button>
+                <p class="mt-3 text-sm text-gray-600 font-semibold">
+                    (Atajo de teclado: **Ctrl + P** o **Cmd + P**)
+                </p>
+            </div>
         </div>
     </div>
 
@@ -144,7 +165,7 @@
     <script type="module">
         // Importaciones de Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, query, onSnapshot, getDocs, addDoc, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, getDocs, addDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         // --- Configuración de FALLBACK (usando las claves de 'control-piscina-48181') ---
@@ -173,11 +194,9 @@
             }
         }
         
-        // CORRECCIÓN 2: Asegurar que appId use el valor inyectado si está disponible y es diferente.
         if (typeof __app_id !== 'undefined' && __app_id.length > 0) {
              appId = __app_id;
         } else {
-             // Si el __app_id inyectado falla, usamos el projectId del fallback.
              appId = firebaseConfig.projectId;
         }
 
@@ -189,14 +208,12 @@
         const productsListBody = document.getElementById('products-list');
         
         let db, auth;
-        // La COLECCIÓN HA SIDO CAMBIADA a 'menu_market' para diferenciarla de otras apps.
         const COLLECTION_NAME = 'menu_market';
 
-        // Determinar el modo administrador
         const urlParams = new URLSearchParams(window.location.search);
         const isAdminMode = urlParams.get('admin') === 'true';
 
-        // Lista de productos actualizada con los últimos datos proporcionados.
+        // Lista de productos por defecto (fallback y carga inicial en modo admin)
         const INITIAL_PRODUCTS = [
             { descripcion_es: "Agua Mineral", description_en: "Mineral water", precio: 4200 },
             { descripcion_es: "Café", description_en: "Coffee", precio: 4500 },
@@ -232,13 +249,10 @@
 
         /**
          * Intenta borrar todos los documentos de la colección.
-         * Solo se llama en Modo Administrador
          */
         async function deleteCollection(productsColRef) {
             try {
                 initMessage.textContent = 'Borrando datos antiguos de la base de datos...';
-                initMessageContainer.classList.remove('hidden');
-
                 const snapshot = await getDocs(productsColRef);
                 const batch = writeBatch(db);
 
@@ -251,39 +265,157 @@
                 initMessage.textContent = 'Datos antiguos borrados exitosamente.';
             } catch (e) {
                 console.error("Error durante la eliminación de datos:", e);
-                initMessage.textContent = `Advertencia: Error al borrar datos antiguos. ${e.message}`;
+                initMessage.textContent = `Advertencia: Error al borrar datos antiguos. Revise las reglas de escritura. ${e.message}`;
             }
         }
         
         /**
          * Carga los datos iniciales.
-         * Solo se llama en Modo Administrador
+         * @param {object} productsColRef - Referencia a la colección de productos.
+         * @param {Array<object>} productsToLoad - Array de objetos de producto.
          */
-        async function initializeData(productsColRef) {
+        async function initializeData(productsColRef, productsToLoad) {
             try {
-                initMessage.textContent = 'Cargando nuevos datos por defecto...';
-                initMessageContainer.classList.remove('hidden');
+                initMessage.textContent = `Cargando ${productsToLoad.length} nuevos productos...`;
 
-                for (const product of INITIAL_PRODUCTS) {
-                    await addDoc(productsColRef, product);
-                }
-                console.log("Datos iniciales cargados exitosamente.");
-                initMessage.textContent = 'Base de datos de precios inicializada con los nuevos datos.';
-                // Ocultar el mensaje después de 5 segundos si está en modo admin
+                const batch = writeBatch(db);
+                productsToLoad.forEach(product => {
+                    const newDocRef = doc(productsColRef);
+                    batch.set(newDocRef, product);
+                });
+
+                await batch.commit();
+                
+                console.log("Datos cargados exitosamente.");
+                initMessage.textContent = `Base de datos de precios actualizada con ${productsToLoad.length} productos.`;
                 setTimeout(() => initMessageContainer.classList.add('hidden'), 5000); 
 
             } catch (e) {
-                console.error("Error durante la inicialización de datos:", e);
-                initMessage.textContent = `Advertencia: Error al cargar datos. ${e.message}`;
+                console.error("Error durante la carga de datos:", e);
+                initMessage.textContent = `Advertencia: Error al cargar datos. Revise las reglas de escritura. ${e.message}`;
                 initMessageContainer.classList.remove('hidden');
             }
         }
+        
+        /**
+         * Parsea el archivo de Excel/CSV a un Array de Objetos de Producto.
+         * Espera columnas llamadas "Descripción", "Description" y "Precio".
+         */
+        function parsePriceListExcel(buffer) {
+            try {
+                // Lee el buffer binario
+                const workbook = XLSX.read(buffer, { type: 'array' });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+                // Convierte la hoja a formato JSON con encabezados como Array de Arrays
+                const aoaData = XLSX.utils.sheet_to_json(worksheet, {
+                    header: 1, 
+                    raw: false,
+                    defval: ''
+                });
+
+                if (aoaData.length <= 1) return []; // Solo encabezado o vacío
+
+                const headers = aoaData[0].map(h => h ? h.toString().trim() : '');
+                const products = [];
+
+                // Normalización de búsqueda de encabezados
+                const normalize = (str) => str.toLowerCase().replace(/[^a-zñáéíóú]/g, '');
+                const colIndex = {
+                    es: headers.findIndex(h => normalize(h).includes('descripcion') || normalize(h).includes('producto')),
+                    en: headers.findIndex(h => normalize(h).includes('description') || normalize(h).includes('english')),
+                    price: headers.findIndex(h => normalize(h).includes('precio') || normalize(h).includes('price'))
+                };
+
+                // Validar que se encontraron las columnas críticas
+                if (colIndex.es === -1 || colIndex.en === -1 || colIndex.price === -1) {
+                    throw new Error("No se encontraron las columnas requeridas: 'Descripción' (ES), 'Description' (EN) y 'Precio'. Revise los encabezados.");
+                }
+
+                // Iterar sobre los datos (saltando el encabezado en i=1)
+                for (let i = 1; i < aoaData.length; i++) {
+                    const row = aoaData[i];
+
+                    const rawPrice = row[colIndex.price];
+                    let numericPrice = parseFloat(String(rawPrice).replace('$', '').replace(/\./g, '').replace(/,/g, '.').trim());
+
+                    if (isNaN(numericPrice)) {
+                        // Intentar corregir formato de miles (si viene como "1.200")
+                        const cleanPrice = String(rawPrice).replace(/\./g, ''); 
+                        numericPrice = parseFloat(cleanPrice);
+                    }
+
+                    // Multiplicar por 100 y redondear si es decimal para manejarlo como entero (centavos)
+                    // Luego se divide por 100 para obtener el valor real.
+                    // Aquí simplemente lo mantenemos como el valor que ingresó el usuario (ej: 4200)
+                    
+                    // Asegurar que el precio es un número entero para la base de datos (como se usa en el array INITIAL_PRODUCTS)
+                    numericPrice = Math.round(numericPrice); 
+                    
+                    products.push({
+                        descripcion_es: String(row[colIndex.es] || '').trim(),
+                        description_en: String(row[colIndex.en] || '').trim(),
+                        precio: numericPrice
+                    });
+                }
+                
+                return products.filter(p => p.descripcion_es.length > 0 && p.precio > 0);
+
+            } catch (error) {
+                console.error("Error al parsear Excel/CSV:", error);
+                throw new Error(`Error de formato de archivo: ${error.message}`);
+            }
+        }
+        
+        /**
+         * Maneja la subida del archivo XLSX/XLS/CSV, lo parsea y actualiza la BD.
+         */
+        window.handleFileUpload = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            initMessage.textContent = `Leyendo archivo: ${file.name}...`;
+            initMessageContainer.classList.remove('hidden');
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const buffer = e.target.result;
+                let parsedData;
+                
+                try {
+                    // El parser de SheetJS soporta todos los formatos.
+                    parsedData = parsePriceListExcel(buffer); 
+                } catch (error) {
+                    errorMessage.textContent = error.message;
+                    errorMessage.classList.remove('hidden');
+                    initMessageContainer.classList.add('hidden');
+                    return;
+                }
+                
+                if (parsedData.length === 0) {
+                    errorMessage.textContent = "El archivo está vacío o no se pudieron extraer productos válidos.";
+                    errorMessage.classList.remove('hidden');
+                    initMessageContainer.classList.add('hidden');
+                    return;
+                }
+                
+                // Si el parseo es exitoso, actualizamos la base de datos.
+                const collectionPath = `/artifacts/${appId}/public/data/${COLLECTION_NAME}`;
+                const productsColRef = collection(db, collectionPath);
+                
+                await deleteCollection(productsColRef);
+                await initializeData(productsColRef, parsedData);
+            };
+            
+            // Leemos el archivo como un ArrayBuffer
+            reader.readAsArrayBuffer(file);
+            event.target.value = null; // Limpiar input para permitir la recarga del mismo archivo
+        };
 
 
         // Función principal de inicialización y carga de datos
         async function initApp() {
             try {
-                // Validación para la configuración de fallback. Si usamos el fallback y no tiene projectId, mostramos error.
                 if (!firebaseConfig.projectId) {
                     throw new Error("La configuración de Firebase está vacía o incompleta.");
                 }
@@ -301,20 +433,24 @@
                 }
                 
                 // 3. Definir la ruta de la colección (Datos Públicos)
-                // Se usa el appId (que ahora tiene un fallback robusto)
                 const collectionPath = `/artifacts/${appId}/public/data/${COLLECTION_NAME}`;
                 const productsColRef = collection(db, collectionPath);
                 
-                // 4. Lógica de Modo Administrador (limpieza y carga)
+                // 4. Lógica de Modo Administrador (inicialización del fallback)
                 if (isAdminMode) {
-                    adminControls.classList.remove('hidden'); // Mostrar el botón de impresión
-                    initMessageContainer.classList.remove('hidden'); // Mostrar el contenedor de mensajes
+                    adminControls.classList.remove('hidden'); // Mostrar el botón de impresión y carga
+                    initMessageContainer.classList.remove('hidden'); 
                     
-                    // Solo para la primera carga y garantizar los nuevos datos
-                    await deleteCollection(productsColRef);
-                    await initializeData(productsColRef);
+                    // Comprobación de existencia: Si no hay datos, carga el fallback (INITIAL_PRODUCTS)
+                    const snapshot = await getDocs(productsColRef);
+                    if (snapshot.empty) {
+                        await initializeData(productsColRef, INITIAL_PRODUCTS);
+                    } else {
+                         // Si ya hay datos, solo mostramos el mensaje de que el modo admin está activo
+                         initMessage.textContent = 'Modo Administrador Activo. Use el botón "Cargar Nueva Lista" para actualizar.';
+                         setTimeout(() => initMessageContainer.classList.add('hidden'), 5000); 
+                    }
                 } else {
-                    // Ocultar mensajes de inicialización si no estamos en modo admin
                     initMessageContainer.classList.add('hidden');
                 }
                 
@@ -326,19 +462,14 @@
                         products.push({ id: doc.id, ...data }); 
                     });
 
-                    // Ordenar los productos localmente por la descripción en español
                     products.sort((a, b) => (a.descripcion_es || '').localeCompare(a.descripcion_es || ''));
 
-                    // Renderizar la tabla
                     renderTable(products);
-
-                    // Ocultar mensaje de carga ya que el listener está activo y ha cargado datos
                     loadingMessage.classList.add('hidden');
 
                 }, (error) => {
                     console.error("Error al obtener los datos de Firestore:", error);
                     loadingMessage.classList.add('hidden');
-                    // Muestra el error de permisos directamente al usuario, ya que es la causa.
                     errorMessage.textContent = `Error de conexión: Missing or insufficient permissions. Revise sus reglas de seguridad para Firestore.`;
                     errorMessage.classList.remove('hidden');
                 });
@@ -370,7 +501,6 @@
                 const row = document.createElement('tr');
                 row.classList.add('hover:bg-gray-50', 'transition', 'duration-150');
                 
-                // Asegurar que los datos estén presentes para evitar errores
                 const descEs = product.descripcion_es || 'N/A';
                 const descEn = product.description_en || 'N/A';
                 const price = formatPrice(product.precio);
@@ -389,7 +519,6 @@
     </script>
     
     <!-- Aviso de seguridad (no visible para el usuario) -->
-    <!-- Nota: La variable __app_id, __firebase_config y __initial_auth_token son inyectadas por el entorno. -->
 
 </body>
 </html>
