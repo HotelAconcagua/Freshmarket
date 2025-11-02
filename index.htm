@@ -149,8 +149,34 @@
 
         // Variables Globales del Entorno (MANDATORIO)
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-freshmarket-app';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        
+        // --- INICIO DE CORRECCIÓN: Manejo de Configuración ---
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Configuración de FALLBACK (usando las claves de 'control-piscina-48181')
+        const FALLBACK_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyD_vUGs0iDY0w45OlFjPCaOX58YI7J0xDI",
+            authDomain: "control-piscina-48181.firebaseapp.com",
+            projectId: "control-piscina-48181",
+            storageBucket: "control-piscina-48181.firebasestorage.app",
+            appId: "1:651276695583:web:02a25b22bcb52d5a05fd2a"
+        };
+
+        // Usa la configuración inyectada por el entorno si existe y no está vacía,
+        // de lo contrario, usa la configuración de fallback.
+        let firebaseConfig = FALLBACK_FIREBASE_CONFIG;
+        if (typeof __firebase_config !== 'undefined') {
+            try {
+                const envConfig = JSON.parse(__firebase_config);
+                if (Object.keys(envConfig).length > 0) {
+                    firebaseConfig = envConfig;
+                }
+            } catch (e) {
+                console.warn("Error al parsear __firebase_config. Usando fallback.");
+            }
+        }
+        // --- FIN DE CORRECCIÓN ---
+
 
         const loadingMessage = document.getElementById('loading-message');
         const errorMessage = document.getElementById('error-message');
@@ -254,8 +280,9 @@
         // Función principal de inicialización y carga de datos
         async function initApp() {
             try {
-                if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
-                    throw new Error("La configuración de Firebase no está disponible.");
+                // Validación para la configuración de fallback. Si usamos el fallback y no tiene projectId, mostramos error.
+                if (!firebaseConfig.projectId) {
+                    throw new Error("La configuración de Firebase está vacía o incompleta.");
                 }
                 
                 // 1. Inicializar Firebase
