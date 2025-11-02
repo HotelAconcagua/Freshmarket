@@ -37,31 +37,47 @@
 
         /* *** Estilos de IMPRESIÓN (Cartelería) *** */
         @media print {
+            
+            /* CRÍTICO: Controla el tamaño de la página física */
+            @page {
+                size: A4;
+                margin: 0.5cm; /* Margen mínimo para la impresora */
+            }
+
             body {
                 background-color: white !important;
                 padding: 0;
+                margin: 0;
             }
             .print-hidden {
                 display: none !important;
             }
             .container-main {
                 max-width: none !important;
-                margin: 0 !important;
-                padding: 0 !important;
+                /* El padding y margen se ajustan para que quepa en el A4 */
+                margin: 0 !important; 
+                padding: 1cm !important; 
                 box-shadow: none !important;
             }
+            
+            /* Asegurar que la tabla y sus elementos no se corten */
+            .price-table {
+                font-size: 10pt;
+                page-break-inside: avoid;
+            }
+
+            /* Estilos de tabla sin colores fuertes y sin bordes de celda */
             .price-table th, .price-table td {
                 padding: 0.75rem; 
                 border-bottom: 1px solid #cccccc;
             }
             .price-table th {
                 background-color: #f0f0f0 !important;
-                -webkit-print-color-adjust: exact; 
-                /* CORRECCIÓN: Usamos la propiedad estándar "print-color-adjust" */
                 print-color-adjust: exact;
             }
-            .price-table {
-                font-size: 10pt;
+            /* Optimizar el contenido del cuerpo para que solo use 1 página */
+            .container-main > * {
+                page-break-after: avoid;
             }
         }
     </style>
